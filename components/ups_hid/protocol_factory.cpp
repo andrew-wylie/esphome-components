@@ -1,6 +1,5 @@
 #include "protocol_factory.h"
 #include "ups_hid.h"
-#include "protocol_eaton.h"
 #include "esphome/core/log.h"
 #include "esphome/components/logger/logger.h"
 #include <algorithm>
@@ -27,20 +26,6 @@ void ProtocolFactory::ensure_initialized() {
     static bool initialized = false;
     if (!initialized) {
         initialized = true;
-
-        // Explicitly register Eaton protocol - static self-registration
-        // can be stripped by the linker in ESP-IDF builds
-        ProtocolInfo eaton_info;
-        eaton_info.creator = [](UpsHidComponent* parent) -> std::unique_ptr<UpsProtocolBase> {
-            return std::make_unique<EatonHidProtocol>(parent);
-        };
-        eaton_info.name = "Eaton HID Protocol";
-        eaton_info.description = "Eaton/MGE HID Power Device protocol with descriptor-driven field mapping";
-        eaton_info.supported_vendors = {0x0463, 0x06DA};
-        eaton_info.priority = 100;
-        register_protocol_for_vendor(0x0463, eaton_info);
-        register_protocol_for_vendor(0x06DA, eaton_info);
-
         if (esphome::logger::global_logger != nullptr)
             ESP_LOGD(FACTORY_TAG, "Protocol factory registries initialized");
     }
