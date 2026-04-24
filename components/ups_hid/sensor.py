@@ -142,27 +142,22 @@ CONFIG_SCHEMA = sensor.sensor_schema(
         cv.Required(CONF_TYPE): cv.one_of(*SENSOR_TYPES, lower=True),
     }
 )
-
-
+            
 async def to_code(config):
     parent = await cg.get_variable(config[CONF_UPS_HID_ID])
+    
+    sensor_type = config[CONF_TYPE]
+    sensor_config = SENSOR_TYPES.get(sensor_type, {})
+    
+    # Inject defaults before creating sensor
+    if "unit_of_measurement" not in config and "unit" in sensor_config:
+        config["unit_of_measurement"] = sensor_config["unit"]
+    if "device_class" not in config and "device_class" in sensor_config:
+        config["device_class"] = sensor_config["device_class"]
+    if "accuracy_decimals" not in config and "accuracy_decimals" in sensor_config:
+        config["accuracy_decimals"] = sensor_config["accuracy_decimals"]
+
     var = await sensor.new_sensor(config)
     await cg.register_component(var, config)
-
-    sensor_type = config[CONF_TYPE]
     cg.add(var.set_sensor_type(sensor_type))
     cg.add(parent.register_sensor(var, sensor_type))
-
-    # Apply sensor type specific configuration
-    if sensor_type in SENSOR_TYPES:
-        sensor_config = SENSOR_TYPES[sensor_type]
-
-        # Override config with sensor type defaults if not specified
-        if "unit_of_measurement" not in config and "unit" in sensor_config:
-            cg.add(var.set_unit_of_measurement_(sensor_config["unit"]))
-
-        if "device_class" not in config and "device_class" in sensor_config:
-            cg.add(var.set_device_class_(sensor_config["device_class"]))
-
-        if "accuracy_decimals" not in config and "accuracy_decimals" in sensor_config:
-            cg.add(var.set_accuracy_decimals(sensor_config["accuracy_decimals"]))
