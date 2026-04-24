@@ -159,7 +159,7 @@ async def to_code(config):
 
         # Override config with sensor type defaults if not specified
         if "unit_of_measurement" not in config and "unit" in sensor_config:
-            cg.add(var.get_unit_of_measurement(sensor_config["unit"]))
+            cg.add(var.set_unit_of_measurement_(sensor_config["unit"]))
 
         if "device_class" not in config and "device_class" in sensor_config:
             cg.add(var.set_device_class_(sensor_config["device_class"]))
