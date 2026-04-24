@@ -62,4 +62,4 @@ async def to_code(config):
 
         # Override config with sensor type defaults if not specified
         if "device_class" not in config and "device_class" in sensor_config:
-            cg.add(var.set_device_class(sensor_config["device_class"]))
+            cg.add(var.set_device_class_(sensor_config["device_class"]))
