@@ -849,7 +849,6 @@ void Esp32UsbTransport::handle_new_device(uint8_t dev_addr) {
 
                 ret = find_endpoints();
                 if (ret == ESP_OK) {
-                    //start_interrupt_in_keepalive();
                     connected_ = true;
                     ESP_LOGI(ESP32_USB_TAG, "UPS device successfully configured and ready");
                     return;
