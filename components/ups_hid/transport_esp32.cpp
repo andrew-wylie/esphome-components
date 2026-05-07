@@ -646,7 +646,7 @@ esp_err_t Esp32UsbTransport::start_interrupt_in_keepalive() {
     interrupt_in_transfer_->device_handle = device_.dev_hdl;
     interrupt_in_transfer_->bEndpointAddress = device_.ep_in;
     interrupt_in_transfer_->num_bytes = pkt_size;
-    interrupt_in_transfer_->timeout_ms = 0;
+    interrupt_in_transfer_->timeout_ms = 500;
     interrupt_in_transfer_->callback = interrupt_in_callback;
     interrupt_in_transfer_->context = this;
 
