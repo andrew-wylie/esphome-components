@@ -266,6 +266,7 @@ bool CyberPowerProtocol::read_hid_report(uint8_t report_id, HidReport &report) {
     report.report_id = report_id;
     report.data.assign(buffer, buffer + buffer_len);
     ESP_LOGD(CP_TAG, "READ SUCCESS: Report 0x%02X (%zu bytes)", report_id, buffer_len);
+    vTaskDelay(pdMS_TO_TICKS(timing::REPORT_RETRY_DELAY_MS)); // Prevent overwhelming low-speed devices
     return true;
   }
   
