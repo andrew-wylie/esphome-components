@@ -678,8 +678,7 @@ void Esp32UsbTransport::interrupt_in_callback(usb_transfer_t *transfer) {
 
     Esp32UsbTransport *self = static_cast<Esp32UsbTransport*>(transfer->context);
 
-    if (transfer->status == USB_TRANSFER_STATUS_COMPLETED ||
-        transfer->status == USB_TRANSFER_STATUS_SHORT_PACKET) {
+    if (transfer->status == USB_TRANSFER_STATUS_COMPLETED) {
         usb_host_transfer_submit(transfer);
     } else {
         ESP_LOGD(ESP32_USB_TAG, "Interrupt IN keepalive stopping: status=%d", transfer->status);
