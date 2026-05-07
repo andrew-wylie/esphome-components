@@ -833,10 +833,9 @@ void Esp32UsbTransport::handle_new_device(uint8_t dev_addr) {
                     idle_transfer->num_bytes        = sizeof(usb_setup_packet_t);
                     idle_transfer->timeout_ms       = 1000;
                     SemaphoreHandle_t sem = xSemaphoreCreateBinary();
-                    struct { SemaphoreHandle_t sem; } ctx = {sem};
-                    idle_transfer->context  = &ctx;
+                    idle_transfer->context  = sem;
                     idle_transfer->callback = [](usb_transfer_t *t) {
-                        xSemaphoreGive(static_cast<decltype(ctx)*>(t->context)->sem);
+                        xSemaphoreGive(static_cast<SemaphoreHandle_t>(t->context));
                     };
                     if (usb_host_transfer_submit_control(device_.client_hdl, idle_transfer) == ESP_OK) {
                         xSemaphoreTake(sem, pdMS_TO_TICKS(1000));
