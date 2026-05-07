@@ -678,12 +678,27 @@ void Esp32UsbTransport::interrupt_in_callback(usb_transfer_t *transfer) {
 
     Esp32UsbTransport *self = static_cast<Esp32UsbTransport*>(transfer->context);
 
-    if (transfer->status == USB_TRANSFER_STATUS_COMPLETED) {
-        usb_host_transfer_submit(transfer);
-    } else {
-        ESP_LOGD(ESP32_USB_TAG, "Interrupt IN keepalive stopping: status=%d", transfer->status);
-        self->interrupt_in_transfer_ = nullptr;
-        usb_host_transfer_free(transfer);
+    switch (transfer->status) {
+
+        case USB_TRANSFER_STATUS_COMPLETED:
+            // Normal case — resubmit
+            usb_host_transfer_submit(transfer);
+            return;
+
+        case USB_TRANSFER_STATUS_NO_DEVICE:
+            // REAL disconnect
+            ESP_LOGI(ESP32_USB_TAG, "Interrupt IN: device removed");
+            self->interrupt_in_transfer_ = nullptr;
+            usb_host_transfer_free(transfer);
+            return;
+
+        default:
+            // Benign transient condition — resubmit
+            ESP_LOGD(ESP32_USB_TAG,
+                     "Interrupt IN transient status=%d, resubmitting",
+                     transfer->status);
+            usb_host_transfer_submit(transfer);
+            return;
     }
 }
 
