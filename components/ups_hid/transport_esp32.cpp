@@ -102,8 +102,17 @@ esp_err_t Esp32UsbTransport::hid_get_report(uint8_t report_type, uint8_t report_
              report_type, report_id, *data_len);
     
     // Use fixed buffer sizes like working implementation
-    uint8_t buffer[64] = {0}; // Fixed size buffer
-    size_t expected_len = std::min(*data_len, sizeof(buffer));
+    // AW fix buffer - start
+    //uint8_t buffer[64] = {0}; // Fixed size buffer
+    //size_t expected_len = std::min(*data_len, sizeof(buffer));
+
+    // Respect device's declared max packet size - some devices (e.g. CyberPower 850VA)
+    // NAK/stall GET_REPORT if wLength exceeds their report size, while others (e.g. CP1500)
+    // are lenient. Using max_packet_size_in ensures compatibility with both.
+    uint8_t buffer[64] = {0};
+    size_t max_pkt = (device_.max_packet_size_in > 0) ? (size_t)device_.max_packet_size_in : sizeof(buffer);
+    size_t expected_len = std::min(*data_len, max_pkt);
+    // AW fix buffer - END
     
     // Create USB control transfer for HID GET_REPORT
     const uint8_t bmRequestType = USB_BM_REQUEST_TYPE_DIR_IN | 
