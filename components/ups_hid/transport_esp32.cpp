@@ -815,6 +815,39 @@ void Esp32UsbTransport::handle_new_device(uint8_t dev_addr) {
             // Try to claim HID interface and find endpoints
             ret = claim_interface();
             if (ret == ESP_OK) {
+                // Send SET_IDLE to properly initialize HID session.
+                // Without this, some devices (e.g. CyberPower 850VA) reset
+                // their USB connection after ~8 seconds.
+                usb_transfer_t *idle_transfer = nullptr;
+                if (usb_host_transfer_alloc(sizeof(usb_setup_packet_t), 0, &idle_transfer) == ESP_OK) {
+                    usb_setup_packet_t *setup = (usb_setup_packet_t*)idle_transfer->data_buffer;
+                    setup->bmRequestType = USB_BM_REQUEST_TYPE_DIR_OUT |
+                                           USB_BM_REQUEST_TYPE_TYPE_CLASS |
+                                           USB_BM_REQUEST_TYPE_RECIP_INTERFACE;
+                    setup->bRequest = 0x0A; // HID SET_IDLE
+                    setup->wValue   = 0;    // duration=0, report_id=0
+                    setup->wIndex   = device_.interface_num;
+                    setup->wLength  = 0;
+                    idle_transfer->device_handle    = device_.dev_hdl;
+                    idle_transfer->bEndpointAddress = 0;
+                    idle_transfer->num_bytes        = sizeof(usb_setup_packet_t);
+                    idle_transfer->timeout_ms       = 1000;
+                    SemaphoreHandle_t sem = xSemaphoreCreateBinary();
+                    struct { SemaphoreHandle_t sem; } ctx = {sem};
+                    idle_transfer->context  = &ctx;
+                    idle_transfer->callback = [](usb_transfer_t *t) {
+                        xSemaphoreGive(static_cast<decltype(ctx)*>(t->context)->sem);
+                    };
+                    if (usb_host_transfer_submit_control(device_.client_hdl, idle_transfer) == ESP_OK) {
+                        xSemaphoreTake(sem, pdMS_TO_TICKS(1000));
+                        ESP_LOGI(ESP32_USB_TAG, "HID SET_IDLE sent successfully");
+                    } else {
+                        ESP_LOGW(ESP32_USB_TAG, "HID SET_IDLE submit failed (non-fatal)");
+                    }
+                    vSemaphoreDelete(sem);
+                    usb_host_transfer_free(idle_transfer);
+                }
+
                 ret = find_endpoints();
                 if (ret == ESP_OK) {
                     start_interrupt_in_keepalive();
