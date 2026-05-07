@@ -627,6 +627,67 @@ esp_err_t Esp32UsbTransport::find_endpoints() {
     return ESP_OK;
 }
 
+esp_err_t Esp32UsbTransport::start_interrupt_in_keepalive() {
+    if (interrupt_in_transfer_) {
+        return ESP_OK; // Already running
+    }
+    if (!device_.dev_hdl || device_.ep_in == 0) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    size_t pkt_size = (device_.max_packet_size_in > 0) ? device_.max_packet_size_in : 8;
+    esp_err_t ret = usb_host_transfer_alloc(pkt_size, 0, &interrupt_in_transfer_);
+    if (ret != ESP_OK) {
+        ESP_LOGW(ESP32_USB_TAG, "Failed to allocate interrupt IN keepalive transfer: %s", esp_err_to_name(ret));
+        interrupt_in_transfer_ = nullptr;
+        return ret;
+    }
+
+    interrupt_in_transfer_->device_handle = device_.dev_hdl;
+    interrupt_in_transfer_->bEndpointAddress = device_.ep_in;
+    interrupt_in_transfer_->num_bytes = pkt_size;
+    interrupt_in_transfer_->timeout_ms = 0;
+    interrupt_in_transfer_->callback = interrupt_in_callback;
+    interrupt_in_transfer_->context = this;
+
+    ret = usb_host_transfer_submit(interrupt_in_transfer_);
+    if (ret != ESP_OK) {
+        ESP_LOGW(ESP32_USB_TAG, "Failed to submit interrupt IN keepalive: %s", esp_err_to_name(ret));
+        usb_host_transfer_free(interrupt_in_transfer_);
+        interrupt_in_transfer_ = nullptr;
+        return ret;
+    }
+
+    ESP_LOGI(ESP32_USB_TAG, "Interrupt IN keepalive started on endpoint 0x%02X", device_.ep_in);
+    return ESP_OK;
+}
+
+void Esp32UsbTransport::stop_interrupt_in_keepalive() {
+    if (interrupt_in_transfer_) {
+        interrupt_in_transfer_->context = nullptr;
+        interrupt_in_transfer_ = nullptr;
+        ESP_LOGD(ESP32_USB_TAG, "Interrupt IN keepalive stopped");
+    }
+}
+
+void Esp32UsbTransport::interrupt_in_callback(usb_transfer_t *transfer) {
+    if (!transfer->context) {
+        usb_host_transfer_free(transfer);
+        return;
+    }
+
+    Esp32UsbTransport *self = static_cast<Esp32UsbTransport*>(transfer->context);
+
+    if (transfer->status == USB_TRANSFER_STATUS_COMPLETED ||
+        transfer->status == USB_TRANSFER_STATUS_SHORT_PACKET) {
+        usb_host_transfer_submit(transfer);
+    } else {
+        ESP_LOGD(ESP32_USB_TAG, "Interrupt IN keepalive stopping: status=%d", transfer->status);
+        self->interrupt_in_transfer_ = nullptr;
+        usb_host_transfer_free(transfer);
+    }
+}
+
 esp_err_t Esp32UsbTransport::submit_control_transfer(uint8_t bmRequestType, uint8_t bRequest,
                                                    uint16_t wValue, uint16_t wIndex,
                                                    uint8_t* data, size_t data_len,
@@ -757,6 +818,7 @@ void Esp32UsbTransport::handle_new_device(uint8_t dev_addr) {
             if (ret == ESP_OK) {
                 ret = find_endpoints();
                 if (ret == ESP_OK) {
+                    start_interrupt_in_keepalive();
                     connected_ = true;
                     ESP_LOGI(ESP32_USB_TAG, "UPS device successfully configured and ready");
                     return;
@@ -779,6 +841,7 @@ void Esp32UsbTransport::handle_device_gone(usb_device_handle_t dev_hdl) {
     
     if (device_.dev_hdl == dev_hdl) {
         connected_ = false;
+        stop_interrupt_in_keepalive();
         
         // Clean up device resources
         if (device_.dev_hdl) {
