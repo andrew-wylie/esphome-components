@@ -713,7 +713,35 @@ void CyberPowerProtocol::parse_firmware_version_report(const HidReport &report, 
   
   // FALLBACK 2: Try other common CyberPower string descriptor indices
   // Some models may use different indices for firmware
-  const uint8_t common_fw_indices[] = {4, 5, 6}; // Common firmware string indices
+  // AW replacing - START
+  // const uint8_t common_fw_indices[] = {4, 5, 6}; // Common firmware string indices
+  // for (uint8_t idx : common_fw_indices) {
+  //   if (idx == string_index) continue; // Already tried this one
+    
+  //   ESP_LOGD(CP_TAG, "Trying alternative firmware string descriptor index: %d", idx);
+  //   std::string fw_attempt;
+  //   esp_err_t ret = parent_->usb_get_string_descriptor(idx, fw_attempt);
+    
+  //   if (ret == ESP_OK && !fw_attempt.empty()) {
+  //     std::string cleaned_fw = clean_firmware_string(fw_attempt);
+  //     if ((cleaned_fw.find("CR") == 0 || cleaned_fw.find("CP") == 0 || 
+  //          cleaned_fw.find("FW") != std::string::npos)) {
+  //       // Looks like a valid CyberPower firmware string
+  //       data.device.firmware_version = cleaned_fw;
+  //       ESP_LOGI(CP_TAG, "Found CyberPower firmware at alternative string descriptor %d: \"%s\"", 
+  //                idx, data.device.firmware_version.c_str());
+  //       if (cleaned_fw != fw_attempt) {
+  //         ESP_LOGD(CP_TAG, "Cleaned alternative firmware string from \"%s\" to \"%s\"", 
+  //                  fw_attempt.c_str(), cleaned_fw.c_str());
+  //       }
+  //       return;
+  //     }
+  //   }
+  // }
+  
+  // Only try index 4 - indices 5+ time out on 850VA causing watchdog crashes
+  // Index 4 returns "PbAcid" (battery chemistry) on 850VA - not firmware, skip quickly
+  const uint8_t common_fw_indices[] = {4}; // Limit to index 4 only
   for (uint8_t idx : common_fw_indices) {
     if (idx == string_index) continue; // Already tried this one
     
@@ -737,6 +765,7 @@ void CyberPowerProtocol::parse_firmware_version_report(const HidReport &report, 
       }
     }
   }
+  // AW replacing - END
   
   // FALLBACK 3: Generate version from binary data as last resort
   if (report.data.size() >= 3) {
