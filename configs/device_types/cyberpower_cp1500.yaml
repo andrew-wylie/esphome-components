@@ -17,7 +17,7 @@ ups_hid:
   update_interval: ${update_interval}
   protocol_timeout: ${protocol_timeout}
   protocol: cyberpower
-  simulation_mode: ${simulation_mode}
+  simulation_mode: "false"
   # Uncomment if auto-detection fails:
   # usb_vendor_id: 0x0764
   # usb_product_id: 0x0501
