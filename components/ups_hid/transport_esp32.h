@@ -96,6 +96,12 @@ private:
                                     uint16_t wValue, uint16_t wIndex,
                                     uint8_t* data, size_t data_len,
                                     uint32_t timeout_ms);
+
+    // Interrupt IN keepalive - prevents UPS from dropping USB connection
+    esp_err_t start_interrupt_in_keepalive();
+    void stop_interrupt_in_keepalive();
+    static void interrupt_in_callback(usb_transfer_t *transfer);
+    usb_transfer_t *interrupt_in_transfer_{nullptr};
 };
 
 } // namespace ups_hid
