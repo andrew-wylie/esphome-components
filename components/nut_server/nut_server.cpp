@@ -9,6 +9,12 @@
 #include <cstring>
 
 #ifdef USE_ESP32
+// Ensure BSD compat socket API is available regardless of LWIP_COMPAT_SOCKETS setting
+#ifndef LWIP_COMPAT_SOCKETS
+#define LWIP_COMPAT_SOCKETS 1
+#endif
+#include "lwip/sockets.h"
+#include "lwip/netdb.h"
 #include "lwip/err.h"
 #include "lwip/sys.h"
 #include <fcntl.h>
@@ -73,7 +79,7 @@ void NutServerComponent::dump_config() {
 bool NutServerComponent::start_server() {
 #ifdef USE_ESP32
   // Create server socket
-  server_socket_ = socket(AF_INET, SOCK_STREAM, 0);
+  server_socket_ = ::socket(AF_INET, SOCK_STREAM, 0);
   if (server_socket_ < 0) {
     ESP_LOGE(TAG, "Failed to create socket: %d", errno);
     return false;
