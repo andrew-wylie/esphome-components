@@ -847,19 +847,25 @@ void Esp32UsbTransport::handle_new_device(uint8_t dev_addr) {
                     idle_transfer->bEndpointAddress = 0;
                     idle_transfer->num_bytes        = sizeof(usb_setup_packet_t);
                     idle_transfer->timeout_ms       = 1000;
-                    SemaphoreHandle_t sem = xSemaphoreCreateBinary();
-                    idle_transfer->context  = sem;
+                    // Fire-and-forget: do NOT use a semaphore to synchronously wait
+                    // inside this callback. handle_new_device() is called from within
+                    // usb_client_event_callback(), which itself runs inside
+                    // usb_host_client_handle_events(). The USB host stack holds an
+                    // internal spinlock during callback dispatch, so calling
+                    // xSemaphoreGive/xSemaphoreTake from a nested transfer callback
+                    // causes a FreeRTOS spinlock assertion (IllegalInstruction crash).
+                    // SET_IDLE is non-fatal: free the transfer in the callback and move on.
+                    idle_transfer->context  = nullptr;
                     idle_transfer->callback = [](usb_transfer_t *t) {
-                        xSemaphoreGive(static_cast<SemaphoreHandle_t>(t->context));
+                        usb_host_transfer_free(t);
                     };
                     if (usb_host_transfer_submit_control(device_.client_hdl, idle_transfer) == ESP_OK) {
-                        xSemaphoreTake(sem, pdMS_TO_TICKS(1000));
-                        ESP_LOGI(ESP32_USB_TAG, "HID SET_IDLE sent successfully");
+                        ESP_LOGI(ESP32_USB_TAG, "HID SET_IDLE submitted (fire-and-forget)");
                     } else {
                         ESP_LOGW(ESP32_USB_TAG, "HID SET_IDLE submit failed (non-fatal)");
+                        usb_host_transfer_free(idle_transfer);
                     }
-                    vSemaphoreDelete(sem);
-                    usb_host_transfer_free(idle_transfer);
+                    // Do NOT free idle_transfer here — the callback owns it now
                 }
 
                 ret = find_endpoints();
